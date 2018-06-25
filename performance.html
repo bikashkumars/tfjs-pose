@@ -1,0 +1,116 @@
+<html>
+
+<head>
+    <!-- Load TensorFlow.js -->
+    <script src="https://unpkg.com/@tensorflow/tfjs"></script>
+    <!-- Load Posenet -->
+    <script src="https://unpkg.com/@tensorflow-models/posenet"></script>
+</head>
+
+<body>
+    <video id="video" playsinline="" style="display:none"></video>
+    <canvas id="canvas"></canvas>
+
+    <script type="text/javascript">
+        videoWidth = 600;
+        videoHeight = 500;
+        poseNetArc = null;
+        canvasObj = null;
+
+        function copyVideoToCanvas() {
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+            var canvasObj = ctx;
+            var video = document.getElementById('video');
+            video.width = videoWidth;
+            video.height = videoHeight;
+            canvas.width = videoWidth;
+            canvas.height = videoHeight;
+
+            video.addEventListener('play', function() {
+                var $this = this; //cache
+                (function loop() {
+                    if (!$this.paused && !$this.ended) {
+                        ctx.drawImage($this, 0, 0);
+                        setTimeout(loop, 1000 / 30); // drawing at 30fps
+                        //ctx.clearRect(0, 0, videoWidth, videoHeight);
+                        aiPoseDetect(canvasObj)
+                    }
+                })();
+            }, 0);
+        }
+
+
+        function openCamera() {
+            var video = document.getElementById('video');
+
+            // Get access to the camera!
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                // Not adding `{ audio: true }` since we only want video now
+                navigator.mediaDevices.getUserMedia({
+                    video: true
+                }).then(function(stream) {
+                    video.src = window.URL.createObjectURL(stream);
+                    video.play();
+                    copyVideoToCanvas()
+                });
+            }
+        }
+
+
+
+
+        async function aiPoseDetect(canvasObj) {
+            var imageScaleFactor = 0.5;
+            var outputStride = 16;
+            var flipHorizontal = true;
+            var maxPoseDetections = 1;
+            var videoId = document.getElementById('video');
+
+            if (poseNetArc == null) {
+                console.log("PostNet Not Loaded Yet !!!")
+                poseNetArc = await posenet.load(0.75);
+            }
+            var pose = await poseNetArc.estimateSinglePose(
+                videoId, imageScaleFactor, flipHorizontal, outputStride, maxPoseDetections);
+
+            var postData = await pose;
+            //console.log(postData);
+            //poses.push(pose);
+            drawPoints(postData, canvasObj);
+        }
+
+        function drawPoints(poseObj, ctx) {
+
+            //console.log(poseObj.keypoints[0].position.x);
+            for (var i = 0; i < poseObj.keypoints.length; i++) {
+                var pointX = (poseObj.keypoints[i].position.x) * 1;
+                var pointY = (poseObj.keypoints[i].position.y) * 1;
+
+                ctx.beginPath();
+                ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
+                ctx.fillStyle = "blue";
+                ctx.fill();
+            }
+
+
+
+            /*
+            for (i = 0; i <= poseObj.keypoints.length; i++) {
+                var pointX = poseObj.keypoints[i].position.x;
+                var pointY = poseObj.keypoints[i].position.y;
+
+                ctx.beginPath();
+                ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
+                ctx.fillStyle = "blue";
+                ctx.fill();
+            }
+            */
+        }
+    </script>
+
+    <button onclick="javascript:openCamera();">Open Camera</button>
+    <button onclick="javascript:aiPoseDetect();">Detect Pose</button>
+</body>
+
+</html>
